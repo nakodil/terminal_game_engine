@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Arcade / Multimedia
+.arcade_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Linter
+ruff.toml
+.ruff_cache/
+
+# Pyinstaller
+build/
+dist/
+*.spec
+
+# Misc
+*.dot
