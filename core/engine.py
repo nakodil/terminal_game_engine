@@ -23,32 +23,40 @@ class Engine:
     def __init__(self, game: Game) -> None:
         """Инициализация."""
         self.fps_max = 60
-        self.render_system = Renderer()
         self.input_system = InputHandler()
-        self.sound_system = SoundManager()
         self.game = game
+        self.sound_system = SoundManager()
+        self.render_system = Renderer()
         self.is_running = False
         self.setup()
         self.mainloop()
 
     def setup(self) -> None:
         """Возвращает все системы в исходное состояние."""
-        self.render_system.setup()
         self.input_system.setup()
-        self.sound_system.setup()
         self.game.setup()
+        self.sound_system.setup()
+        self.render_system.setup()
         self.is_running = True
 
-        # сначала нарисуем первый кадр, потом будем ждать клавишу
-        self.render_system.update(
-            self.game.bg_layer,
-            self.game.fg_layer,
-            self.game.hints,
-            self.game.messages,
-        )
+        # Рисуем первый кадр сразу.
+        render_data = self.game.get_render_data()
+        self.render_system.update(render_data)
 
     def update(self) -> None:
-        """Такт главного цикла."""
+        """Такт главного цикла.
+
+        1. Обновляет систему ввода;
+        2. Получает нажатую клавишу из системы ввода;
+        3. Завершается если клавиша пустая
+           - пошаговая игра: все ждут "хода" игрока;
+        4. Проверяет выход по клавише q;
+        5. Отдает клавишу игре;
+        6. Обновляет систему звука;
+        7. Получает примитивы спрайтов игры;
+        8. Отдает на рендер:
+           фоновый слой игры, примитивы спрайтов игры, подсказки, сообщения.
+        """
         self.input_system.update()
         key_pressed = self.input_system.get_key_pressed()
 
@@ -60,21 +68,17 @@ class Engine:
 
         self.sound_system.update()
 
-        self.render_system.update(
-            self.game.bg_layer,
-            self.game.fg_layer,
-            self.game.hints,
-            self.game.messages,
-        )
+        render_data = self.game.get_render_data()
+        self.render_system.update(render_data)
 
     def on_key(self, key: str) -> None:
-        """Выход клавишей Q."""
+        """Выход клавишей q."""
         if key == config.CONTROLS["exit"]:
             self.is_running = False
 
     def mainloop(self) -> None:
         """Главный цикл."""
-        while self.is_running:
+        while self.is_running:  # меняется в on_key
             self.update()
             time.sleep(1 / self.fps_max)  # разгружаем процессор
         self.exit()

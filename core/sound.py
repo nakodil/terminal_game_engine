@@ -9,13 +9,18 @@ class SoundManager:
     """Менеджер звуков."""
 
     def __init__(self) -> None:
-        """Инициализирует менеджер."""
+        """Инициализирует менеджер со всеми звуками из папки."""
         self.sounds: dict[str, str] = {}
-        # Загрузить все звуки из assets/sound/
+
+        if not config.SOUND_DIR.exists():
+            return
+
+        for file_path in config.SOUND_DIR.glob("*.wav"):
+            self._load(file_path.stem, file_path.name)
 
     def setup(self) -> None:
         """Исходное состояние."""
-        # Заглушить все звуки
+        self.stop()
 
     def update(self) -> None:
         """Обновление."""
@@ -26,7 +31,7 @@ class SoundManager:
 
     def play(self, name: str) -> None:
         """Проигрывает звук (асинхронно)."""
-        path = self.sounds.get(name)
+        path = self.sounds.get(name, None)
         if not path:
             return
 

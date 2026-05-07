@@ -2,28 +2,16 @@
 
 import os
 
-import config
-from game import Sprite
-
 
 class Renderer:
-    """Объект для вывода на экран.
-
-    Неблокирующий неморгающий вывод в терминал:
-        Перед первым кадром весь текст в терминале очищается.
-        Кадр в виде строки собирается из игрового поля.
-        Курсор консоли помещается в верхний левый угол (0, 0)
-        с помощью последовательности ANSI.
-        Следующий кадр выводится поверх предыдущего за один вызов print().
-        Частота отрисовки сделана не ожиданием программы, а накоплением delta_time
-    """
+    """Система рендера для терминала."""
 
     def __init__(self) -> None:
-        """Инициализирует экземпляр для вывода на экран."""
+        """Инициализирует систему рендера."""
         self.show_cursor_char = "\033[?25h"
         self.hide_cursor_char = "\033[?25l"
         self.reset_cursor_char = "\033[H"
-        self.colors_mapping = {
+        self.colors = {
             "black":   "\033[30m",
             "red":     "\033[31m",
             "green":   "\033[32m",
@@ -32,83 +20,74 @@ class Renderer:
             "magenta": "\033[35m",
             "cyan":    "\033[36m",
             "white":   "\033[37m",
-            "reset": "\033[0m",
+            "reset":   "\033[0m",
         }
-
-    def _clear(self) -> None:
-        """Очищает терминал."""
-        if os.name == "nt":
-            os.system("cls")
-        else:
-            os.system("clear")
+        self.layout = {
+            "карта": 51,
+            "история": 30,
+            "игрок": 30,
+        }
 
     def setup(self) -> None:
         """Подготавливает консоль к рендеру."""
-        os.system("cls")
+        os.system("cls" if os.name == "nt" else "clear")
 
-    def update(
-            self,
-            bg_layer: list[list[str]],
-            fg_layer: list[Sprite],
-            hints: list[str],
-            messages: list[str],
-    ) -> None:
-        """Обновление."""
-        self.render(
-            bg_layer,
-            fg_layer,
-            hints,
-            messages,
-        )
+    def update(self, render_data: tuple) -> None:
+        """Запускает отрисовку полученных из игры данных (контента виджетов)."""
+        self.render(render_data)
 
-    def render(
-            self,
-            bg_layer: list[list[str]],
-            fg_layer: list[Sprite],
-            hints: list[str],
-            messages: list[str],
-        ) -> None:
-        """Собирает и выводит кадр в терминал."""
-        if not bg_layer:
-            err_no_bg = "Нет фонового слоя."
-            raise RuntimeError(err_no_bg)
-        if not fg_layer:
-            err_no_fg = "Нет слоя спрайтов."
-            raise RuntimeError(err_no_fg)
-
-        bg_layer_copy = [row[:] for row in bg_layer]
-
-        for sprite in fg_layer:
-            colored_img = (
-                self.colors_mapping[sprite.color]
-                + sprite.img
-                + self.colors_mapping["reset"]
+    def _get_map_rows_formatted(self, data: list) -> list[str]:
+        """Возвращает ряды карты, наполненные цветными символами."""
+        reset_color = self.colors["reset"]
+        fallback_color = self.colors["red"]
+        return [
+            "".join(
+                f"{self.colors.get(color, fallback_color)}"
+                f"{char}"
+                f"{reset_color}"
+                for char, color in row
             )
-            bg_layer_copy[sprite.y][sprite.x] = colored_img
+            for row in data
+        ]
 
-        framed_world = self._get_framed_layer(bg_layer_copy, config.TITLE)
+    def _get_textbox_rows_formatted(
+            self,
+            data: list,
+            width: int,
+            height: int,
+    ) -> list[str]:
+        """Возвращает ряды текста."""
+        rows = [str(line)[:width].ljust(width) for line in data[:height]]
+        # Добиваем пустотой до нужной высоты
+        return rows + [" " * width] * (height - len(rows))
 
-        if hints:
-            framed_world += ", ".join(hints)
+    def render(self, widgets_content: tuple[list]) -> None:
+        """Отрисовка в терминале."""
+        all_rows = []
+        height = len(widgets_content[0])  # все виджеты высотой с карту
+        for widget_idx, widget_data in enumerate(self.layout.items()):
+            title = widget_data[0].upper()
+            width = widget_data[1]
+            data = widgets_content[widget_idx]
+            if widget_idx == 0:
+                widget_rows = self._get_map_rows_formatted(data)
+            else:
+                widget_rows = self._get_textbox_rows_formatted(data, width, height)
+            widget_rows_framed = self._add_frame(widget_rows, title, width)
+            all_rows.append(widget_rows_framed)
 
-        if messages:
-            framed_world += "\n" + "\n".join(map(str, messages)) + "\n"
+        all_rows_formatted = ["".join(parts) for parts in zip(*all_rows, strict=True)]
+        full_frame = "\n".join(all_rows_formatted)
+        print(f"{self.reset_cursor_char}{self.hide_cursor_char}{full_frame}")
 
-        full_frame = (
-            self.reset_cursor_char
-            + self.hide_cursor_char
-            + framed_world
-        )
-        print(full_frame)
-
-    def _get_framed_layer(self, layer: list[list[str]], title: str) -> str:
-        """Возвращает слой строкой с рамкой вокруг."""
-        framed_world = "┌" + title.center(len(layer[0]), "─") + "┐\n"
-        for row in layer:
-            framed_world += "│" + "".join(row) + "│\n"
-        framed_world += "└" + "─" * len(layer[0]) + "┘\n"
-        return framed_world
+    def _add_frame(self, rows: list[str], title: str, width: int) -> list[str]:
+        """Оборачивает список строк в рамку."""
+        return [
+            f"┌{title.center(width, '─')}┐",
+            *[f"│{line}│" for line in rows],
+            f"└{'─' * width}┘",
+        ]
 
     def exit(self) -> None:
-        """Возвращает видимость курсора."""
+        """Восстанавливает терминал."""
         print(self.show_cursor_char)
