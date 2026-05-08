@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import config
+from core.event import Event
 
 from .sprite import Coin, Door, Fence, Npc, Player, Sprite, Wall
 
@@ -31,8 +32,8 @@ class Game:
         self.map: list[list[str]] = []
         self.sprites: list[Sprite] = []
         self.player: Player | None = None
-        self.hints = [""]
-        self.messages = [""]
+        self.events: list[Event] = []
+        self.messages: list[str] = []
 
     def _set_world(self) -> None:
         """Создает мир.
@@ -106,7 +107,7 @@ class Game:
         self.sprites = []
         self.player = None
         self._set_world()
-        self.hints = config.HINTS
+        self.events = []
         self.messages = ["игра началась"]
 
     def _setup_sprites(self, world_width: int, world_height: int) -> None:
@@ -152,13 +153,18 @@ class Game:
             ):
                 self.sprites.remove(sprite)
                 self.player.coins += 1  # Нет интерфейса!
-                # Событие вызвано игрой или игроком? Шина событий?
-                self.messages.append(f"{self.player.name} подобрал {sprite.name}")
+                event = Event(
+                    message=f"{self.player.name} подобрал {sprite.name}",
+                    sound="collect",
+                    )
+                self.events.append(event)
 
     def update(self, key: str) -> None:
         """Обновление спрайтов."""
         for sprite in self.sprites:
-            sprite.update(key, self.sprites)
+            moved = sprite.update(key, self.sprites)
+            if sprite is self.player and moved:
+                self.events.append(Event(sound="walk"))
         self._check_interactions()
 
     def exit(self) -> None:

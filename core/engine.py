@@ -23,13 +23,28 @@ class Engine:
     def __init__(self, game: Game) -> None:
         """Инициализация."""
         self.fps_max = 60
-        self.input_system = InputHandler()
         self.game = game
+        self.input_system = InputHandler()
         self.sound_system = SoundManager()
         self.render_system = Renderer()
         self.is_running = False
         self.setup()
         self.mainloop()
+
+    def _handle_events(self) -> None:
+        """Диспетчер событий.
+
+        1. Выбирает самое старое событие игры;
+        2. Удаляет его;
+        3. Отдает текст события в сообщения игры;
+        4. Отдает звук системе звука.
+        """
+        while self.game.events:
+            event = self.game.events.pop(0)
+            if event.message:
+                self.game.messages.append(event.message)
+            if event.sound:
+                self.sound_system.play(event.sound)
 
     def setup(self) -> None:
         """Возвращает все системы в исходное состояние."""
@@ -54,8 +69,7 @@ class Engine:
         5. Отдает клавишу игре;
         6. Обновляет систему звука;
         7. Получает примитивы спрайтов игры;
-        8. Отдает на рендер:
-           фоновый слой игры, примитивы спрайтов игры, подсказки, сообщения.
+        8. Отдает на рендер данные игры.
         """
         self.input_system.update()
         key_pressed = self.input_system.get_key_pressed()
@@ -65,6 +79,8 @@ class Engine:
 
         self.on_key(key_pressed)
         self.game.update(key_pressed)
+
+        self._handle_events()
 
         self.sound_system.update()
 

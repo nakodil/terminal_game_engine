@@ -27,28 +27,30 @@ class Sprite(ABC):
         self.max_x = x_max
         self.max_y = y_max
 
-    def update(self, _: str, __: list[Sprite]) -> None:
-        """Теперь принимает список всех спрайтов."""
-        return
+    def update(self, _: str, __: list[Sprite]) -> bool:
+        """Обновление."""
+        return False
 
-    def move(self, delta_x: int, delta_y: int, sprites: list[Sprite]) -> None:
+    def move(self, delta_x: int, delta_y: int, sprites: list[Sprite]) -> bool:
         """Движение.
 
         Вычисляет новые координаты;
         Проверяет выход за пределы "экрана";
         Проверяет столкновения с препятствиями;
         Задает спрайту новые координаты.
+        Возвращает True, если спрайт смог двинуться.
         """
         new_x = self.x + delta_x
         new_y = self.y + delta_y
 
         if self.is_offscreen(new_x, new_y):
-            return
+            return False
 
         if self.is_colliding_obstacle(new_x, new_y, sprites):
-            return
+            return False
 
         self.x, self.y = new_x, new_y
+        return True
 
     def is_colliding_obstacle(
             self, x: int, y: int, sprites: list[Sprite],
@@ -98,7 +100,7 @@ class Player(Sprite):
             f"управление: {up}{down}{left}{right}"
         )
 
-    def update(self, key: str, sprites: list[Sprite]) -> None:
+    def update(self, key: str, sprites: list[Sprite]) -> bool:
         """Реакция на клавиши – движение."""
         super().update(key, sprites)
         dx, dy = 0, 0
@@ -110,9 +112,7 @@ class Player(Sprite):
             dx = -1
         elif key == config.CONTROLS["right"]:
             dx = 1
-
-        if dx != 0 or dy != 0:
-            self.move(dx, dy, sprites)
+        return self.move(dx, dy, sprites)
 
 
 class Obstacle(Sprite, ABC):
