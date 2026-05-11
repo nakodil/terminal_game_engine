@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
-import config
+if TYPE_CHECKING:
+    from .event import Event
 
 
 class Sprite(ABC):
@@ -23,6 +25,9 @@ class Sprite(ABC):
         self.img = "?"
         self.color = "white"
         self.speed = 0
+        self.hp = 100
+        self.hp_max = self.hp
+        self.coins = 0
         self.is_visible = True
         self.message = "Привет!"
         self.min_x, self.min_y = 0, 0
@@ -36,6 +41,10 @@ class Sprite(ABC):
     def update(self, _: str, __: list[Sprite]) -> bool:
         """Обновление."""
         return False
+
+    def interact(self, _: Sprite) -> Event | None:
+        """Вызывается, когда на этот спрайт "наступает" игрок."""
+        return None
 
     def move(self, delta_x: int, delta_y: int, sprites: list[Sprite]) -> bool:
         """Движение.
@@ -78,149 +87,3 @@ class Sprite(ABC):
             or
             y < self.min_y or y > self.max_y
         )
-
-
-class Player(Sprite):
-    """Игрок с управлением клавишами."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует спрайт."""
-        super().__init__(x, y)
-        self.img = "@"
-        self.color = "green"
-        self.name = "Вася Питонов"
-        self.hp_max = 100
-        self.hp = self.hp_max
-        self.coins = 0
-
-    def __str__(self) -> str:
-        """Статы."""
-        up = config.CONTROLS["up"]
-        down = config.CONTROLS["down"]
-        left = config.CONTROLS["left"]
-        right = config.CONTROLS["right"]
-        return (
-            f"{self.name}; "
-            f"здоровье: {self.hp}/{self.hp_max}; "
-            f"монеты: {self.coins}; "
-            f"управление: {up}{down}{left}{right}"
-        )
-
-    def update(self, key: str, sprites: list[Sprite]) -> bool:
-        """Реакция на клавиши – движение."""
-        super().update(key, sprites)
-        dx, dy = 0, 0
-        if key == config.CONTROLS["up"]:
-            dy = -1
-        elif key == config.CONTROLS["down"]:
-            dy = 1
-        elif key == config.CONTROLS["left"]:
-            dx = -1
-        elif key == config.CONTROLS["right"]:
-            dx = 1
-        return self.move(dx, dy, sprites)
-
-
-class Obstacle(Sprite, ABC):
-    """Непроходимое препятствие."""
-
-    @abstractmethod
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует препятствие."""
-        super().__init__(x, y)
-        self.color = "red"
-
-
-class Wall(Obstacle):
-    """Стена."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализация."""
-        super().__init__(x, y)
-        self.img = "█"
-
-
-class Fence(Obstacle):
-    """Забор."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализация."""
-        super().__init__(x, y)
-        self.img = "#"
-
-
-class Door(Sprite):
-    """Дверь."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует дверь."""
-        super().__init__(x, y)
-        self.img = "D"
-        self.color = "magenta"
-        self.is_solid = False  # Del on prod!
-
-
-class Collectable(Sprite):
-    """Подбираемый предмет."""
-
-    @abstractmethod
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует предмет."""
-        super().__init__(x, y)
-        self.is_solid = False
-        self.name = "подбираемый предмет"
-        self.img = "$"
-        self.color = "white"
-
-
-class Coin(Collectable):
-    """Монета."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует монету."""
-        super().__init__(x, y)
-        self.name = "монета"
-        self.img = "●"
-        self.color = "yellow"
-
-
-class MovingNpc(Sprite):
-    """Непись ходящий в стороны."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует спрайт."""
-        super().__init__(x, y)
-        self.img = "a"
-        self.color = "blue"
-        self.speed = 1
-
-    def update(self, key: str, sprites: list[Sprite]) -> None:
-        """Движение из стороны в сторону."""
-        super().update(key, sprites)
-
-        if self.speed == 0:
-            return
-
-        new_x = self.x + self.speed
-        new_y = self.y
-
-        if self.is_offscreen(new_x, new_y):
-            self.speed *= -1
-            new_x = self.x + self.speed
-
-        if self.is_colliding_solid_sprite(new_x, new_y, sprites):
-            self.speed *= -1
-            new_x = self.x + self.speed
-
-        self.x = new_x
-        self.y = new_y
-
-
-class Npc(Sprite):
-    """Непись."""
-
-    def __init__(self, x: int, y: int) -> None:
-        """Инициализирует спрайт."""
-        super().__init__(x, y)
-        self.img = "a"
-        self.color = "blue"

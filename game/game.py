@@ -3,10 +3,16 @@
 from pathlib import Path
 
 import config
-from core.event import Event
 
-from .sprite import Coin, Door, Fence, Npc, Player, Sprite, Wall
+from .collectable import Coin, Collectable
+from .event import Event
+from .interactive import Door
+from .npc import Anakondova, Gadukin
+from .obstacle import Fence, Wall
+from .player import Player
+from .sprite import Sprite
 
+# куда бы их деть?
 SHADES = {
     "0%": " ",
     "25%": "░",
@@ -24,7 +30,8 @@ class Game:
         self.sprites_img_mapping = {
             "D": Door,
             "@": Player,
-            "a": Npc,
+            "A": Anakondova,
+            "G": Gadukin,
             "█": Wall,
             "#": Fence,
             "●": Coin,
@@ -137,50 +144,70 @@ class Game:
 
         return frame
 
-    def _check_interactions(self) -> None:
-        """Обработка взаимодействий игрока и спрайтов."""
-        if not self.player:
-            return
-
-        for sprite in self.sprites[:]:
-
-            # игрок не взаимодействует с собой
-            if sprite is self.player:
-                continue
-
-            # пропускаем спрайты не в координатах игрока
-            if not (
-                sprite.x == self.player.x
-                and sprite.y == self.player.y
+    def get_sprite_at(self, x: int, y: int) -> Sprite | None:
+        """Возвращает спрайт по указанным координатам (кроме игрока)."""
+        for sprite in self.sprites:
+            if (
+                sprite is not self.player
+                and sprite.x == x
+                and sprite.y == y
             ):
-                continue
-
-            # подбор монеты
-            if isinstance(sprite, Coin):
-                self.sprites.remove(sprite)
-                self.player.coins += 1  # Нет интерфейса!
-                event = Event(
-                    message=f"{self.player.name} подобрал {sprite.name}",
-                    sound="collect",
-                    )
-                self.events.append(event)
-
-            # разговор с NPC
-            if isinstance(sprite, Npc):
-                event = Event(
-                    message=f"{sprite.name}: {sprite.message}",
-                    sound="collect",
-                    )
-                self.events.append(event)
+                return sprite
+        return None
 
     def update(self, key: str) -> None:
-        """Обновление спрайтов."""
+        """Обновление состояния игры за один такт."""
+        # 1. Получаем вектор движения игрока
+        offset = self._get_move_offset(key)
+
+        # 2. Если игрок нажал на движение — обрабатываем экшен
+        if offset and self.player:
+            self._handle_player_step(*offset)
+
+        # 3. Обновляем все остальные спрайты
+        self._update_others(key)
+
+    def _get_move_offset(self, key: str) -> tuple[int, int] | None:
+        """Превращает клавишу в вектор (dx, dy)."""
+        move_map = {
+            config.CONTROLS["up"]: (0, -1),
+            config.CONTROLS["down"]: (0, 1),
+            config.CONTROLS["left"]: (-1, 0),
+            config.CONTROLS["right"]: (1, 0),
+        }
+        return move_map.get(key)
+
+    def _handle_player_step(self, dx: int, dy: int) -> None:
+        """Логика взаимодействия игрока с миром при попытке шага."""
+        if self.player is None:
+            return
+        target_x = self.player.x + dx
+        target_y = self.player.y + dy
+        target_sprite = self.get_sprite_at(target_x, target_y)
+
+        # Если впереди кто-то есть — взаимодействуем
+        if target_sprite:
+            event = target_sprite.interact(self.player)
+            if event:
+                self.events.append(event)
+
+            # Если это предмет — убираем его
+            if isinstance(target_sprite, Collectable):
+                self.sprites.remove(target_sprite)
+
+            # Если объект твердый — прерываем шаг
+            if target_sprite.is_solid:
+                return
+
+        # Если мы здесь — путь либо пуст, либо там был нетвердый объект (монета)
+        if self.player.move(dx, dy, self.sprites):
+            self.events.append(Event(sound="walk"))
+
+    def _update_others(self, key: str) -> None:
+        """Обновляет логику всех спрайтов, кроме игрока."""
         for sprite in self.sprites:
-            moved = sprite.update(key, self.sprites)
-            if sprite is self.player and moved:
-                message = f"{sprite.name} шагнул"
-                self.events.append(Event(message=message, sound="walk"))
-        self._check_interactions()
+            if sprite is not self.player:
+                sprite.update(key, self.sprites)
 
     def exit(self) -> None:
         """Выход из игры."""

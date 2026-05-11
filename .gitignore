@@ -30,3 +30,8 @@ dist/
 
 # Misc
 *.dot
+
+# Tools
+tree.py
+effects.py
+ansi_test.py
