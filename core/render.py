@@ -28,23 +28,25 @@ class Renderer:
             "игрок": 30,
         }
 
-    def setup(self) -> None:
-        """Подготавливает консоль к рендеру."""
+    def setup(self, render_data: tuple) -> None:
+        """Очищает терминал и рисует в нем первый кадр."""
         os.system("cls" if os.name == "nt" else "clear")
+        print(self.hide_cursor_char)
+        self.render(render_data)
 
     def update(self, render_data: tuple) -> None:
-        """Запускает отрисовку полученных из игры данных (контента виджетов)."""
+        """Обновление."""
         self.render(render_data)
 
     def _get_map_rows_formatted(self, data: list) -> list[str]:
         """Возвращает ряды карты, наполненные цветными символами."""
-        reset_color = self.colors["reset"]
-        fallback_color = self.colors["red"]
+        reset = self.colors["reset"]
+        fallback = self.colors["red"]
         return [
             "".join(
-                f"{self.colors.get(color, fallback_color)}"
+                f"{self.colors.get(color, fallback)}"
                 f"{char}"
-                f"{reset_color}"
+                f"{reset}"
                 for char, color in row
             )
             for row in data
@@ -56,13 +58,17 @@ class Renderer:
             width: int,
             height: int,
     ) -> list[str]:
-        """Возвращает ряды текста."""
+        """Возвращает ряды текста.
+
+        Берет последние ряды данных с конца.
+        Вставляет ряды из пробелов снизу до нужной высоты.
+        """
+        data = data[-height:]
         rows = [str(line)[:width].ljust(width) for line in data[:height]]
-        # Добиваем пустотой до нужной высоты
         return rows + [" " * width] * (height - len(rows))
 
     def render(self, widgets_content: tuple[list]) -> None:
-        """Отрисовка в терминале."""
+        """Выводит в терминал кадр: горизонтальный ряд из 3 виджетов."""
         all_rows = []
         height = len(widgets_content[0])  # все виджеты высотой с карту
         for widget_idx, widget_data in enumerate(self.layout.items()):
@@ -78,7 +84,7 @@ class Renderer:
 
         all_rows_formatted = ["".join(parts) for parts in zip(*all_rows, strict=True)]
         full_frame = "\n".join(all_rows_formatted)
-        print(f"{self.reset_cursor_char}{self.hide_cursor_char}{full_frame}")
+        print(f"{self.reset_cursor_char}{full_frame}")
 
     def _add_frame(self, rows: list[str], title: str, width: int) -> list[str]:
         """Оборачивает список строк в рамку."""
@@ -89,5 +95,8 @@ class Renderer:
         ]
 
     def exit(self) -> None:
-        """Восстанавливает терминал."""
+        """Выход.
+
+        Возвращает видимость курсору терминала.
+        """
         print(self.show_cursor_char)

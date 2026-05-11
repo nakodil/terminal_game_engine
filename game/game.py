@@ -29,7 +29,7 @@ class Game:
             "#": Fence,
             "●": Coin,
         }
-        self.map: list[list[str]] = []
+        self.world_map: list[list[str]] = []
         self.sprites: list[Sprite] = []
         self.player: Player | None = None
         self.events: list[Event] = []
@@ -42,31 +42,31 @@ class Game:
         Определяет размеры игрвого мира;
         Создает карту;
         Создает спрайты.
-        TODO: Проверить на одинаковое количество колонн в рядах!
         """
-        world_rows = self._get_world_from_txt("world.txt")
+        world_rows = self._get_world_from_file("world.txt")
+
         world_width = max(len(row.strip()) for row in world_rows) if world_rows else 0
         world_height = len(world_rows)
 
-        self.map = self._get_map(world_width, world_height)
+        self.world_map = self._get_map(world_width, world_height, SHADES["25%"])
 
         self.sprites = self._get_sprites(world_rows)
         self._setup_sprites(world_width, world_height)
 
-    def _get_world_from_txt(self, filename: str) -> list[str]:
+    def _get_world_from_file(self, filename: str) -> list[str]:
         """Читает мир из TXT файла, возвращает ряды мира."""
         world_file_path = config.GAME_DIR / filename
         try:
-            with Path.open(world_file_path, mode="r", encoding="utf-8") as world_file:
-                rows = world_file.readlines()
+            with Path.open(world_file_path, encoding="utf-8") as world_file:
+                world_rows = world_file.readlines()
         except FileNotFoundError:
             return []
-        return rows
+        return world_rows
 
-    def _get_map(self, width: int, height: int) -> list[list[str]]:
-        """Возвращает двухмерную карту заполненную фоновой текстурой."""
+    def _get_map(self, width: int, height: int, img: str) -> list[list[str]]:
+        """Возвращает двухмерную карту заполненную одинаковыми текстурами."""
         return [
-            [SHADES["25%"] for _ in range(width)]
+            [img for _ in range(width)]
             for _ in range(height)
         ]
 
@@ -103,7 +103,7 @@ class Game:
 
     def setup(self) -> None:
         """Исходное состояние."""
-        self.map = []
+        self.world_map = []
         self.sprites = []
         self.player = None
         self._set_world()
@@ -128,7 +128,7 @@ class Game:
         bg_color = "white"
         frame = [
             [(char, bg_color) for char in row]
-            for row in self.map
+            for row in self.world_map
         ]
 
         for sprite in self.sprites:
@@ -143,18 +143,32 @@ class Game:
             return
 
         for sprite in self.sprites[:]:
+
+            # игрок не взаимодействует с собой
             if sprite is self.player:
                 continue
 
-            if (
+            # пропускаем спрайты не в координатах игрока
+            if not (
                 sprite.x == self.player.x
                 and sprite.y == self.player.y
-                and isinstance(sprite, Coin)
             ):
+                continue
+
+            # подбор монеты
+            if isinstance(sprite, Coin):
                 self.sprites.remove(sprite)
                 self.player.coins += 1  # Нет интерфейса!
                 event = Event(
                     message=f"{self.player.name} подобрал {sprite.name}",
+                    sound="collect",
+                    )
+                self.events.append(event)
+
+            # разговор с NPC
+            if isinstance(sprite, Npc):
+                event = Event(
+                    message=f"{sprite.name}: {sprite.message}",
                     sound="collect",
                     )
                 self.events.append(event)
@@ -164,7 +178,8 @@ class Game:
         for sprite in self.sprites:
             moved = sprite.update(key, self.sprites)
             if sprite is self.player and moved:
-                self.events.append(Event(sound="walk"))
+                message = f"{sprite.name} шагнул"
+                self.events.append(Event(message=message, sound="walk"))
         self._check_interactions()
 
     def exit(self) -> None:

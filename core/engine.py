@@ -51,12 +51,9 @@ class Engine:
         self.input_system.setup()
         self.game.setup()
         self.sound_system.setup()
-        self.render_system.setup()
-        self.is_running = True
-
-        # Рисуем первый кадр сразу.
         render_data = self.game.get_render_data()
-        self.render_system.update(render_data)
+        self.render_system.setup(render_data)
+        self.is_running = True
 
     def update(self) -> None:
         """Такт главного цикла.

@@ -11,16 +11,22 @@ class Sprite(ABC):
     """Спрайт – игровой объект на поле."""
 
     @abstractmethod
-    def __init__(self, x: int, y: int) -> None:
+    def __init__(
+        self,
+        x: int,
+        y: int,
+    ) -> None:
         """Инициализирует спрайт."""
+        self.is_solid = True  # Спрайты не проходят сквозь друг друга
         self.x, self.y = x, y  # Как запретить спавн на занятые клетки?
+        self.name = "Cпрайт"
+        self.img = "?"
+        self.color = "white"
+        self.speed = 0
+        self.is_visible = True
+        self.message = "Привет!"
         self.min_x, self.min_y = 0, 0
         self.max_x, self.max_y = 0, 0
-        self.img = "?"
-        self.color = "red"
-        self.is_visible = True
-        self.speed = 0
-        self.name = "дефолтный спрайт"
 
     def setup(self, x_max: int, y_max: int) -> None:
         """Задает границы движения."""
@@ -46,19 +52,19 @@ class Sprite(ABC):
         if self.is_offscreen(new_x, new_y):
             return False
 
-        if self.is_colliding_obstacle(new_x, new_y, sprites):
+        if self.is_colliding_solid_sprite(new_x, new_y, sprites):
             return False
 
         self.x, self.y = new_x, new_y
         return True
 
-    def is_colliding_obstacle(
+    def is_colliding_solid_sprite(
             self, x: int, y: int, sprites: list[Sprite],
     ) -> bool:
-        """Коллизии с препятствиями."""
+        """Коллизии с другими спрайтами."""
         for sprite in sprites:
             if (
-                isinstance(sprite, Obstacle)
+                sprite.is_solid
                 and sprite.x == x
                 and sprite.y == y
             ):
@@ -122,6 +128,7 @@ class Obstacle(Sprite, ABC):
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует препятствие."""
         super().__init__(x, y)
+        self.color = "red"
 
 
 class Wall(Obstacle):
@@ -131,7 +138,6 @@ class Wall(Obstacle):
         """Инициализация."""
         super().__init__(x, y)
         self.img = "█"
-        self.color = "red"
 
 
 class Fence(Obstacle):
@@ -141,7 +147,6 @@ class Fence(Obstacle):
         """Инициализация."""
         super().__init__(x, y)
         self.img = "#"
-        self.color = "red"
 
 
 class Door(Sprite):
@@ -152,6 +157,7 @@ class Door(Sprite):
         super().__init__(x, y)
         self.img = "D"
         self.color = "magenta"
+        self.is_solid = False  # Del on prod!
 
 
 class Collectable(Sprite):
@@ -161,6 +167,7 @@ class Collectable(Sprite):
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует предмет."""
         super().__init__(x, y)
+        self.is_solid = False
         self.name = "подбираемый предмет"
         self.img = "$"
         self.color = "white"
@@ -175,11 +182,10 @@ class Coin(Collectable):
         self.name = "монета"
         self.img = "●"
         self.color = "yellow"
-        self.value = 1
 
 
-class Npc(Sprite):
-    """Непись."""
+class MovingNpc(Sprite):
+    """Непись ходящий в стороны."""
 
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует спрайт."""
@@ -202,9 +208,19 @@ class Npc(Sprite):
             self.speed *= -1
             new_x = self.x + self.speed
 
-        if self.is_colliding_obstacle(new_x, new_y, sprites):
+        if self.is_colliding_solid_sprite(new_x, new_y, sprites):
             self.speed *= -1
             new_x = self.x + self.speed
 
         self.x = new_x
         self.y = new_y
+
+
+class Npc(Sprite):
+    """Непись."""
+
+    def __init__(self, x: int, y: int) -> None:
+        """Инициализирует спрайт."""
+        super().__init__(x, y)
+        self.img = "a"
+        self.color = "blue"
