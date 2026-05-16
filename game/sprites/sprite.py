@@ -6,11 +6,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .event import Event
+    from game.models import Event
 
 
 class Sprite(ABC):
     """Спрайт – игровой объект на поле."""
+
+    img = "?"
 
     @abstractmethod
     def __init__(
@@ -22,13 +24,13 @@ class Sprite(ABC):
         self.is_solid = True  # Спрайты не проходят сквозь друг друга
         self.x, self.y = x, y  # Как запретить спавн на занятые клетки?
         self.name = "Cпрайт"
-        self.img = "?"
         self.color = "white"
         self.speed = 0
         self.hp = 100
         self.hp_max = self.hp
         self.coins = 0
         self.is_visible = True
+        self.is_interactive = False
         self.message = "Привет!"
         self.min_x, self.min_y = 0, 0
         self.max_x, self.max_y = 0, 0

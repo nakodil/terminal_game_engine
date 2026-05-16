@@ -3,11 +3,10 @@
 import time
 
 import config
+from core.input import InputHandler
+from core.render import Renderer
+from core.sound import SoundManager
 from game import Game
-
-from .input import InputHandler
-from .render import Renderer
-from .sound import SoundManager
 
 
 class Engine:

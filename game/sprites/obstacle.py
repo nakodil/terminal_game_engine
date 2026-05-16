@@ -18,16 +18,18 @@ class Obstacle(Sprite, ABC):
 class Wall(Obstacle):
     """Стена."""
 
+    img = "█"
+
     def __init__(self, x: int, y: int) -> None:
         """Инициализация."""
         super().__init__(x, y)
-        self.img = "█"
 
 
 class Fence(Obstacle):
     """Забор."""
 
+    img = "#"
+
     def __init__(self, x: int, y: int) -> None:
         """Инициализация."""
         super().__init__(x, y)
-        self.img = "#"

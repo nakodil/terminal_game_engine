@@ -35,7 +35,7 @@ class SoundManager:
         if not path:
             return
 
-        # FIXME: От частого проигрывания коротких звуков у меня отваливается BT гарнитура
+        # FIXME: От частого проигрывания коротких звуков отваливается BT гарнитура
         # winsound.PlaySound(path, winsound.SND_FILENAME | winsound.SND_ASYNC)
 
     def stop(self) -> None:

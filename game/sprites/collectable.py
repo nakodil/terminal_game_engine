@@ -2,17 +2,21 @@
 
 from abc import ABC, abstractmethod
 
-from .event import Event
+from game.models import Event
+
 from .sprite import Sprite
 
 
 class Collectable(Sprite, ABC):
     """Подбираемый предмет."""
 
+    img = "?"
+
     @abstractmethod
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует предмет."""
         super().__init__(x, y)
+        self.is_interactive = True
         self.is_solid = False
         self.name = "подбираемый предмет"
         self.img = "$"
@@ -22,11 +26,12 @@ class Collectable(Sprite, ABC):
 class Coin(Collectable):
     """Монета."""
 
+    img = "●"
+
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует монету."""
         super().__init__(x, y)
         self.name = "монета"
-        self.img = "●"
         self.color = "yellow"
 
     def interact(self, sprite: Sprite) -> Event | None:

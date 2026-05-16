@@ -3,14 +3,18 @@
 from pathlib import Path
 
 import config
-
-from .collectable import Coin, Collectable
-from .event import Event
-from .interactive import Door
-from .npc import Anakondova, Gadukin
-from .obstacle import Fence, Wall
-from .player import Player
-from .sprite import Sprite
+from game.models import Event, FrameData
+from game.sprites import (
+    Anakondova,
+    Coin,
+    Collectable,
+    Door,
+    Fence,
+    Gadukin,
+    Player,
+    Sprite,
+    Wall,
+)
 
 # куда бы их деть?
 SHADES = {
@@ -27,14 +31,10 @@ class Game:
 
     def __init__(self) -> None:
         """Инициализация."""
+        sprites_classes = (Door, Player, Anakondova, Gadukin, Wall, Fence, Coin)
         self.sprites_img_mapping = {
-            "D": Door,
-            "@": Player,
-            "A": Anakondova,
-            "G": Gadukin,
-            "█": Wall,
-            "#": Fence,
-            "●": Coin,
+            sprite_class.img: sprite_class
+            for sprite_class in sprites_classes
         }
         self.world_map: list[list[str]] = []
         self.sprites: list[Sprite] = []
@@ -80,32 +80,35 @@ class Game:
     def _get_sprites(self, rows: list[str]) -> list[Sprite]:
         """Создает спрайты - список игровых объектов."""
         sprites = []
-        player = None
+        player: Player | None = None  # 1. Явно подсказываем тип для Pylance
+
         for row_idx, row in enumerate(rows):
             for col_idx, char in enumerate(row.strip()):
                 sprite_class = self.sprites_img_mapping.get(char)
                 if sprite_class:
                     new_sprite = sprite_class(col_idx, row_idx)
-                    if sprite_class == Player:
+                    if isinstance(new_sprite, Player):
                         player = new_sprite
                         continue
                     sprites.append(new_sprite)
+
         if player:
             sprites.append(player)  # игрок всегда на переднем плане
             self.player = player
+
         return sprites
 
-    def get_render_data(self) -> tuple:
-        """Отдает данные для рендера.
+    def get_render_data(self) -> FrameData:
+        """Отдает стандартизированные данные для рендера."""
+        left_lines = [*str(self.player).split("; "), "", *self._get_all_hints()]
 
-        Карта;
-        Сообщения;
-        Статы игрока.
-        """
-        return (
-            self.get_frame_matrix(),
-            self.messages,
-            str(self.player).split("; "),
+        # Последние сообщения сверху
+        right_lines = list(reversed(self.messages))
+
+        return FrameData(
+            left_panel_lines=left_lines,
+            center_matrix=self._get_frame_matrix(),
+            right_panel_lines=right_lines,
         )
 
     def setup(self) -> None:
@@ -115,14 +118,17 @@ class Game:
         self.player = None
         self._set_world()
         self.events = []
-        self.messages = ["игра началась"]
+        self.messages = []
+        if self.player:
+            start_message = f"{self.player.name} пришел в Энск"
+            self.messages.append(start_message)
 
     def _setup_sprites(self, world_width: int, world_height: int) -> None:
         """Ограничивает координаты движения спрайтов."""
         for sprite in self.sprites:
             sprite.setup(world_width - 1, world_height - 1)
 
-    def get_frame_matrix(self) -> list[list[tuple[str, str]]]:
+    def _get_frame_matrix(self) -> list[list[tuple[str, str]]]:
         """Собирает кадр.
 
         Примитив - кортеж строк (символ, цвет).
@@ -144,6 +150,43 @@ class Game:
 
         return frame
 
+    def _get_nearby_sprites(self) -> dict[str, Sprite]:
+        """Ищет интерактивные объекты в радиусе 1 клетки."""
+        if not self.player:
+            return {}
+
+        check_points = [
+            (0, 0, "под ногами"),
+            (0, -1, "сверху"),
+            (0, 1, "снизу"),
+            (-1, 0, "слева"),
+            (1, 0, "справа"),
+        ]
+
+        targets = {}
+        for dx, dy, label in check_points:
+            target = self.get_sprite_at(self.player.x + dx, self.player.y + dy)
+            # Проверяем, что это не игрок и со спрайтом можно взаимодействовать
+            if (
+                target
+                and target is not self.player
+                and target.is_interactive
+            ):
+                targets[label] = target
+
+        return targets
+
+    def _get_action_hints(self, targets: dict[str, Sprite]) -> list[str]:
+        """Формирует список подсказок для игрока."""
+        hints = []
+        keys = ["1", "2", "3", "4", "5"]
+
+        for i, (label, sprite) in enumerate(targets.items()):
+            if i < len(keys):
+                hints.append(f"[{keys[i]}] {sprite.name} ({label})")
+
+        return hints
+
     def get_sprite_at(self, x: int, y: int) -> Sprite | None:
         """Возвращает спрайт по указанным координатам (кроме игрока)."""
         for sprite in self.sprites:
@@ -156,16 +199,54 @@ class Game:
         return None
 
     def update(self, key: str) -> None:
-        """Обновление состояния игры за один такт."""
-        # 1. Получаем вектор движения игрока
-        offset = self._get_move_offset(key)
+        """Обновление."""
+        # 1. Сканируем окружение
+        targets = self._get_nearby_sprites()
 
-        # 2. Если игрок нажал на движение — обрабатываем экшен
-        if offset and self.player:
+        # 2. Если нажата клавиша взаимодействия (например, '1'...'5')
+        action_keys = ["1", "2", "3", "4", "5"]
+        if key in action_keys:
+            idx = action_keys.index(key)
+            # Взаимодействие с целью
+            if idx < len(targets):
+                target_sprite = list(targets.values())[idx]
+                self._execute_interaction(target_sprite)
+                return # Завершаем ход после действия
+
+        # 3. Обработка движения
+        offset = self._get_move_offset(key)
+        if offset:
             self._handle_player_step(*offset)
 
-        # 3. Обновляем все остальные спрайты
         self._update_others(key)
+
+    def _get_all_hints(self) -> list[str]:
+        """Собирает все доступные команды для виджета подсказок."""
+        hints = [
+            f"[{config.CONTROLS["up"]}] вверх",
+            f"[{config.CONTROLS["down"]}] вниз",
+            f"[{config.CONTROLS["left"]}] влево",
+            f"[{config.CONTROLS["right"]}] вправо",
+            f"[{config.CONTROLS["exit"]}] выход из игры",
+        ]
+
+        targets = self._get_nearby_sprites()
+        if targets:
+            hints.extend(self._get_action_hints(targets))
+
+        return hints
+
+    def _execute_interaction(self, target: Sprite) -> None:
+        """Логика выполнения самого действия."""
+        if not self.player:
+            return
+
+        event = target.interact(self.player)
+        if event:
+            self.events.append(event)
+
+        if isinstance(target, Collectable):
+            self.sprites.remove(target)
 
     def _get_move_offset(self, key: str) -> tuple[int, int] | None:
         """Превращает клавишу в вектор (dx, dy)."""
@@ -178,28 +259,19 @@ class Game:
         return move_map.get(key)
 
     def _handle_player_step(self, dx: int, dy: int) -> None:
-        """Логика взаимодействия игрока с миром при попытке шага."""
+        """Логика движения."""
         if self.player is None:
             return
+
         target_x = self.player.x + dx
         target_y = self.player.y + dy
         target_sprite = self.get_sprite_at(target_x, target_y)
 
-        # Если впереди кто-то есть — взаимодействуем
-        if target_sprite:
-            event = target_sprite.interact(self.player)
-            if event:
-                self.events.append(event)
+        # Если впереди твердый объект (стена, забор) — просто стоим
+        if target_sprite and target_sprite.is_solid:
+            return
 
-            # Если это предмет — убираем его
-            if isinstance(target_sprite, Collectable):
-                self.sprites.remove(target_sprite)
-
-            # Если объект твердый — прерываем шаг
-            if target_sprite.is_solid:
-                return
-
-        # Если мы здесь — путь либо пуст, либо там был нетвердый объект (монета)
+        # Если путь свободен (или там нетвердый спрайт типа монеты) — идем
         if self.player.move(dx, dy, self.sprites):
             self.events.append(Event(sound="walk"))
 
