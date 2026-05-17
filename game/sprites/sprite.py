@@ -12,7 +12,9 @@ if TYPE_CHECKING:
 class Sprite(ABC):
     """Спрайт – игровой объект на поле."""
 
+    name = "Cпрайт"
     img = "?"
+    color = "white"
 
     @abstractmethod
     def __init__(
@@ -23,8 +25,6 @@ class Sprite(ABC):
         """Инициализирует спрайт."""
         self.is_solid = True  # Спрайты не проходят сквозь друг друга
         self.x, self.y = x, y  # Как запретить спавн на занятые клетки?
-        self.name = "Cпрайт"
-        self.color = "white"
         self.speed = 0
         self.hp = 100
         self.hp_max = self.hp

@@ -13,10 +13,10 @@ class Engine:
     """Движок - фасад к системам.
 
     Системы:
-    рендер,
-    звук,
-    ввод с клавиатуры,
-    игра.
+        рендер,
+        звук,
+        ввод с клавиатуры,
+        игра.
     """
 
     def __init__(self, game: Game) -> None:
@@ -50,8 +50,12 @@ class Engine:
         self.input_system.setup()
         self.game.setup()
         self.sound_system.setup()
+        self.render_system.setup()
+
+        # Сразу рисуем первый кадр
         render_data = self.game.get_render_data()
-        self.render_system.setup(render_data)
+        self.render_system.render(render_data)
+
         self.is_running = True
 
     def update(self) -> None:
@@ -77,11 +81,11 @@ class Engine:
         self.game.update(key_pressed)
 
         self._handle_events()
-
         self.sound_system.update()
 
+        # Запрашиваем у игры чистый FrameData и отправляем в новый метод render
         render_data = self.game.get_render_data()
-        self.render_system.update(render_data)
+        self.render_system.render(render_data)
 
     def on_key(self, key: str) -> None:
         """Выход клавишей q."""

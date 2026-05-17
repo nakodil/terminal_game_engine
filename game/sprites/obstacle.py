@@ -8,17 +8,19 @@ from .sprite import Sprite
 class Obstacle(Sprite, ABC):
     """Непроходимое препятствие."""
 
+    color = "red"
+
     @abstractmethod
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует препятствие."""
         super().__init__(x, y)
-        self.color = "red"
 
 
 class Wall(Obstacle):
     """Стена."""
 
     img = "█"
+    name = "стена"
 
     def __init__(self, x: int, y: int) -> None:
         """Инициализация."""
@@ -29,6 +31,7 @@ class Fence(Obstacle):
     """Забор."""
 
     img = "#"
+    name = "забор"
 
     def __init__(self, x: int, y: int) -> None:
         """Инициализация."""

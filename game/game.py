@@ -100,15 +100,12 @@ class Game:
 
     def get_render_data(self) -> FrameData:
         """Отдает стандартизированные данные для рендера."""
-        left_lines = [*str(self.player).split("; "), "", *self._get_all_hints()]
-
-        # Последние сообщения сверху
-        right_lines = list(reversed(self.messages))
-
         return FrameData(
-            left_panel_lines=left_lines,
-            center_matrix=self._get_frame_matrix(),
-            right_panel_lines=right_lines,
+            stats_lines=str(self.player).split("; "),
+            hints_lines=self._get_all_hints(),
+            map_matrix=self._get_frame_matrix(),
+            legend=self._get_legend(),
+            log_lines=list(reversed(self.messages)),  # Последние сообщения будут сверху
         )
 
     def setup(self) -> None:
@@ -128,27 +125,31 @@ class Game:
         for sprite in self.sprites:
             sprite.setup(world_width - 1, world_height - 1)
 
-    def _get_frame_matrix(self) -> list[list[tuple[str, str]]]:
-        """Собирает кадр.
+    def _get_frame_matrix(self) -> list[list[tuple[str, str, str]]]:
+        """Собирает кадр, объединяя символы, цвета текста и фона."""
+        ground_fg = "black"
+        ground_bg = "bg_black"  # <--- Задаем базовый цвет фона земли
 
-        Примитив - кортеж строк (символ, цвет).
-        Доступ к примитиву: кадр[idx_ряда][idx_колонны].
-
-        1. Заполняет весь кадр примитивами фона;
-        2. Заменяет нужные ячейки кадра примитивами спрайтов;
-        3. Возвращает кадр.
-        """
-        bg_color = "white"
+        # 1. Заполняем карту землей (символ, цвет текста, цвет фона)
         frame = [
-            [(char, bg_color) for char in row]
+            [(char, ground_fg, ground_bg) for char in row]
             for row in self.world_map
         ]
 
+        # 2. Накладываем спрайты
         for sprite in self.sprites:
             if sprite.is_visible:
-                frame[sprite.y][sprite.x] = (sprite.img, sprite.color)
+                # Магия: узнаем, какой фон у клетки ПРЯМО ПОД спрайтом
+                _, _, current_bg = frame[sprite.y][sprite.x]
+
+                # Рисуем спрайт с его цветом, но СОХРАНЯЕМ фон земли под ним!
+                frame[sprite.y][sprite.x] = (sprite.img, sprite.color, current_bg)
 
         return frame
+
+    def _get_legend(self) -> list[str]:
+        """Возвращает легенду: изображение - имя спрайта."""
+        return list({f"{sprite.img} - {sprite.name}" for sprite in self.sprites})
 
     def _get_nearby_sprites(self) -> dict[str, Sprite]:
         """Ищет интерактивные объекты в радиусе 1 клетки."""

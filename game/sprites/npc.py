@@ -11,14 +11,14 @@ class Npc(Sprite, ABC):
     """Непись."""
 
     img = "?"
+    name = "NPC"
+    color = "green"
 
     @ abstractmethod
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует спрайт."""
         super().__init__(x, y)
         self.is_interactive = True
-        self.name = "NPC"
-        self.color = "green"
         self.message = "бу-бу-бу"
 
     def interact(self, _: Sprite) -> Event | None:

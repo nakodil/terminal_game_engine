@@ -10,7 +10,9 @@ from .sprite import Sprite
 class Collectable(Sprite, ABC):
     """Подбираемый предмет."""
 
+    name = "подбираемый предмет"
     img = "?"
+    color = "white"
 
     @abstractmethod
     def __init__(self, x: int, y: int) -> None:
@@ -18,21 +20,18 @@ class Collectable(Sprite, ABC):
         super().__init__(x, y)
         self.is_interactive = True
         self.is_solid = False
-        self.name = "подбираемый предмет"
-        self.img = "$"
-        self.color = "white"
 
 
 class Coin(Collectable):
     """Монета."""
 
+    name = "монета"
     img = "●"
+    color = "yellow"
 
     def __init__(self, x: int, y: int) -> None:
         """Инициализирует монету."""
         super().__init__(x, y)
-        self.name = "монета"
-        self.color = "yellow"
 
     def interact(self, sprite: Sprite) -> Event | None:
         """Вызывается, когда на этот спрайт "наступает" игрок."""
