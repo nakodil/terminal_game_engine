@@ -58,6 +58,8 @@ class Game:
         self.world_map = self._get_map(world_width, world_height, SHADES["25%"])
 
         self.sprites = self._get_sprites(world_rows)
+        self.sprites.append(Coin(6, 3))  # del on prod
+        self.sprites.append(Coin(6, 3))  # del on prod
         self._setup_sprites(world_width, world_height)
 
     def _get_world_from_file(self, filename: str) -> list[str]:
@@ -79,8 +81,8 @@ class Game:
 
     def _get_sprites(self, rows: list[str]) -> list[Sprite]:
         """Создает спрайты - список игровых объектов."""
-        sprites = []
-        player: Player | None = None  # 1. Явно подсказываем тип для Pylance
+        self.sprites.clear() # На всякий случай очищаем список
+        player: Player | None = None
 
         for row_idx, row in enumerate(rows):
             for col_idx, char in enumerate(row.strip()):
@@ -90,13 +92,13 @@ class Game:
                     if isinstance(new_sprite, Player):
                         player = new_sprite
                         continue
-                    sprites.append(new_sprite)
+                    self.spawn_sprite(new_sprite)
 
         if player:
-            sprites.append(player)  # игрок всегда на переднем плане
+            self.spawn_sprite(player)  # Спавним именно player, а не new_sprite
             self.player = player
 
-        return sprites
+        return self.sprites # Возвращаем заполненный список
 
     def get_render_data(self) -> FrameData:
         """Отдает стандартизированные данные для рендера."""
@@ -139,11 +141,12 @@ class Game:
         # 2. Накладываем спрайты
         for sprite in self.sprites:
             if sprite.is_visible:
-                # Магия: узнаем, какой фон у клетки ПРЯМО ПОД спрайтом
-                _, _, current_bg = frame[sprite.y][sprite.x]
-
-                # Рисуем спрайт с его цветом, но СОХРАНЯЕМ фон земли под ним!
-                frame[sprite.y][sprite.x] = (sprite.img, sprite.color, current_bg)
+                # Спрайт с символом своего цвета, но фоном клетки под ним
+                frame[sprite.y][sprite.x] = (
+                    sprite.img,
+                    sprite.color,
+                    frame[sprite.y][sprite.x][2],
+                )
 
         return frame
 
@@ -152,7 +155,7 @@ class Game:
         return list({f"{sprite.img} - {sprite.name}" for sprite in self.sprites})
 
     def _get_nearby_sprites(self) -> dict[str, Sprite]:
-        """Ищет интерактивные объекты в радиусе 1 клетки."""
+        """Ищет интерактивные объекты накрест с поддержкой кучи предметов."""
         if not self.player:
             return {}
 
@@ -165,22 +168,36 @@ class Game:
         ]
 
         targets = {}
-        for dx, dy, label in check_points:
-            target = self.get_sprite_at(self.player.x + dx, self.player.y + dy)
-            # Проверяем, что это не игрок и со спрайтом можно взаимодействовать
-            if (
-                target
-                and target is not self.player
-                and target.is_interactive
-            ):
-                targets[label] = target
+        for dx, dy, base_label in check_points:
+            target_x = self.player.x + dx
+            target_y = self.player.y + dy
+
+            # Собираем ВСЕ интерактивные спрайты на этой клетке
+            cell_sprites = [
+                s for s in self.sprites
+                if s is not self.player
+                and s.x == target_x
+                and s.y == target_y
+                and s.is_interactive
+            ]
+
+            if not cell_sprites:
+                continue
+
+            # Если предмет один — используем базовый ключ ("под ногами")
+            if len(cell_sprites) == 1:
+                targets[base_label] = cell_sprites[0]
+            # Если предметов несколько — добавляем индексы ("под ногами (1)")
+            else:
+                for i, target in enumerate(cell_sprites, start=1):
+                    targets[f"{base_label} {i}"] = target
 
         return targets
 
     def _get_action_hints(self, targets: dict[str, Sprite]) -> list[str]:
         """Формирует список подсказок для игрока."""
         hints = []
-        keys = ["1", "2", "3", "4", "5"]
+        keys = [str(i) for i in range(1, 10)]
 
         for i, (label, sprite) in enumerate(targets.items()):
             if i < len(keys):
@@ -205,7 +222,7 @@ class Game:
         targets = self._get_nearby_sprites()
 
         # 2. Если нажата клавиша взаимодействия (например, '1'...'5')
-        action_keys = ["1", "2", "3", "4", "5"]
+        action_keys = [str(i) for i in range(1, 10)]
         if key in action_keys:
             idx = action_keys.index(key)
             # Взаимодействие с целью
@@ -260,19 +277,22 @@ class Game:
         return move_map.get(key)
 
     def _handle_player_step(self, dx: int, dy: int) -> None:
-        """Логика движения."""
+        """Логика движения с проверкой всех объектов на клетке."""
         if self.player is None:
             return
 
         target_x = self.player.x + dx
         target_y = self.player.y + dy
-        target_sprite = self.get_sprite_at(target_x, target_y)
 
-        # Если впереди твердый объект (стена, забор) — просто стоим
-        if target_sprite and target_sprite.is_solid:
+        # Ищем, есть ли на целевой клетке ХОТЯ БЫ ОДИН твердый объект
+        is_blocked = any(
+            s.is_solid for s in self.sprites
+            if s.x == target_x and s.y == target_y and s is not self.player
+        )
+
+        if is_blocked:
             return
 
-        # Если путь свободен (или там нетвердый спрайт типа монеты) — идем
         if self.player.move(dx, dy, self.sprites):
             self.events.append(Event(sound="walk"))
 
@@ -281,6 +301,22 @@ class Game:
         for sprite in self.sprites:
             if sprite is not self.player:
                 sprite.update(key, self.sprites)
+
+    def spawn_sprite(self, new_sprite: Sprite) -> bool:
+        """Добавляет спрайт.
+
+        Запрещает спавн твердых объектов на другие твердые объекты.
+        """
+        if new_sprite.is_solid:
+            is_occupied = any(
+                s.is_solid and s.x == new_sprite.x and s.y == new_sprite.y
+                for s in self.sprites
+            )
+            if is_occupied:
+                return False
+
+        self.sprites.append(new_sprite)
+        return True
 
     def exit(self) -> None:
         """Выход из игры."""

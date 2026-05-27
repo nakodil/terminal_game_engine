@@ -33,13 +33,15 @@ class Engine:
     def _handle_events(self) -> None:
         """Диспетчер событий.
 
-        1. Выбирает самое старое событие игры;
-        2. Удаляет его;
-        3. Отдает текст события в сообщения игры;
-        4. Отдает звук системе звука.
+        1. Перебирает все текущие события игры;
+        2. Отдает текст события в сообщения игры;
+        3. Отдает звук системе звука;
+        4. Очищает список событий.
         """
-        while self.game.events:
-            event = self.game.events.pop(0)
+        events = self.game.events[:]
+        self.game.events.clear()
+
+        for event in events:
             if event.message:
                 self.game.messages.append(event.message)
             if event.sound:
@@ -83,7 +85,6 @@ class Engine:
         self._handle_events()
         self.sound_system.update()
 
-        # Запрашиваем у игры чистый FrameData и отправляем в новый метод render
         render_data = self.game.get_render_data()
         self.render_system.render(render_data)
 
@@ -94,7 +95,7 @@ class Engine:
 
     def mainloop(self) -> None:
         """Главный цикл."""
-        while self.is_running:  # меняется в on_key
+        while self.is_running:
             self.update()
             time.sleep(1 / self.fps_max)  # разгружаем процессор
         self.exit()

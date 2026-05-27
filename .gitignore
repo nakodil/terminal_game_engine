@@ -35,3 +35,4 @@ dist/
 tree.py
 effects.py
 ansi_test.py
+dump.py
